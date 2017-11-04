@@ -1,11 +1,29 @@
+import com.opencsv.bean.CsvToBeanBuilder;
+
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.util.List;
 import java.util.Scanner;
 
-public class Magic {
-    private static final String CALL_SAMPLE = "data/CallSample.csv";
+public class Driver {
+    private static final String CALL_SAMPLE = "data/CallSample2.csv";
     private static final String PRICE_SAMPLE = "data/PriceSampleData.csv";
 
     public static void main(String[] args){
+        List<Call> result = null;
+        try {
+            result = new CsvToBeanBuilder(new FileReader(CALL_SAMPLE)).withType(Call.class).build().parse();
+        } catch (FileNotFoundException e) {
+            System.out.println("Couldn't find file");
+            e.printStackTrace();
+        }
+
+
+        loopingStrategy();
+    }
+
+    private static void loopingStrategy() {
         try {
             Scanner callSampleScanner = new Scanner(new File(CALL_SAMPLE));
             callSampleScanner.useDelimiter(",");
