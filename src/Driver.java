@@ -9,7 +9,7 @@ import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 public class Driver {
-    private static final String CALL_FILE = "data/855530b3ea9531b8.csv";
+    private static final String CALL_FILE = "data/calldata.csv";
     private static final String PRICE_FILE = "data/PRICEDATASP500.csv";
 
     public static void main(String[] args){
@@ -33,66 +33,49 @@ public class Driver {
             callVolatilities[i][0] = prices.get(i)[0];
         }
 
-        int numCompanies = companies.length;
-        Price current = new Price(args(calls));
-        int currentDate = current.date;
-        int currentYear = currentDate/10000;
-        int rowBeforeYear = 1;
-        int currentRow;
+        Call current = null;
+        int currentRow = 0;
 
-        try {
-            year:
-            while(calls.hasNext()) {
-                company:
-                for(int j = 1; j < numCompanies; j++){
-                    String currentCompany = prices.get(0)[j];//TODO: Add checker to make sure next company has any entries in a given year (otherwise skip), make sure no data is entered for callVolatilities if min is -1 at the end (currently puts 0 inside).
-                    if(!currentCompany.equals(current.company)) continue;
-                    currentRow = rowBeforeYear;
-                    while(Integer.parseInt(prices.get(currentRow)[0]) != current.date) currentRow++;
-                    while(current.company.equals(currentCompany)) {
-                        double min = -1;
-                        double minVol = 0;
-                        currentDate = current.date;
-                        while (current.date == currentDate) {
-                            double diff = Math.abs(Double.parseDouble(prices.get(currentRow)[j]) - current.strike);
-                            if(min == -1 || diff < min){
-                                min = diff;
-                                minVol = current.volatility;
-                            }
+        while(current == null){
+            current = nextCall(calls);
+        }
+        currentRow = getCurrentRow(0, current, prices);
+        String currentCompany = current.company;
 
-                            current = new Price(args(calls));
-                        }
-                        callVolatilities[currentRow][j] = minVol+"";
-                        if (current.date / 10000 != currentYear) {
-                            rowBeforeYear = currentRow;
-                            currentYear = current.date / 10000;
-                            while(Integer.parseInt(prices.get(currentRow)[0]) != current.date) currentRow++;
-                            continue year;
-                        } else if (!current.company.equals(currentCompany)) {
-                            continue company;
-                        }
-                        while(Integer.parseInt(prices.get(currentRow)[0]) != current.date) currentRow++;
-
+        for(int i = 1; i < companies.length; i++){
+            while(current.company.equals(currentCompany)){
+                int currentDate = current.date;
+                double min = -1;
+                double minVol = 0;
+                while (current.date == currentDate) {
+                    double diff = Math.abs(Double.parseDouble(prices.get(currentRow)[i]) - current.strike);
+                    if(min == -1 || diff < min){
+                        min = diff;
+                        minVol = current.volatility;
                     }
+                    do {
+                        current = nextCall(calls);
+                    } while(current == null);
                 }
-            }
-        } finally { //After all rows have been parsed
-            try {
-                CSVWriter writer = new CSVWriter(new FileWriter("out/sampleCallOutput.csv"));
-                for(String[] row : callVolatilities)
-                    writer.writeNext(row);
-                writer.close();
-            } catch (IOException e) {
-                System.out.println("Failure");
-                e.printStackTrace();
+                callVolatilities[currentRow][i] = min == -1 ? "" : minVol+"";
+                currentRow = getCurrentRow(currentRow, current, prices);
             }
         }
+
+        //optimizedLoops(calls, prices, companies, callVolatilities);
     }
 
-    private static String[] args(Scanner scanner){
+    private static int getCurrentRow(int start, Call call, List<String[]> prices){
+        int row = start;
+        while(Integer.parseInt(prices.get(row)[0]) != call.date){
+            row++;
+        }
+        return row;
+    }
 
+    private static Call nextCall(Scanner scanner){
         try {
-            return new String[]{
+            return Call.get(new String[]{
                     scanner.next(),//secid
                     scanner.next(),//date
                     scanner.next(),//days
@@ -101,7 +84,7 @@ public class Driver {
                     scanner.next(),//flag
                     scanner.next(),//company
                     scanner.next()//index
-            };
+            });
         } catch (NoSuchElementException e) {
             return null;
         }
