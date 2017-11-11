@@ -4,13 +4,15 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
 
 public class Driver {
-    private static final String CALL_FILE = "data/calldata.csv";
-    private static final String PRICE_FILE = "data/PRICEDATASP500.csv";
+    public static final String DATA_PUT_OUTPUT_CSV = "data/PutOutput.csv";
+    private static final String CALL_FILE = "data/putsdata.csv";
+    private static final String PRICE_FILE = "data/pricedata.csv";
 
     public static void main(String[] args){
         Scanner calls;
@@ -39,36 +41,60 @@ public class Driver {
         while(current == null){
             current = nextCall(calls);
         }
-        currentRow = getCurrentRow(0, current, prices);
-        String currentCompany = current.company;
 
+        loop:
         for(int i = 1; i < companies.length; i++){
+            currentRow = getCurrentRow(1, current, prices);
+            String currentCompany = current.company;
+            if(!prices.get(0)[i].equals(currentCompany)) continue;
             while(current.company.equals(currentCompany)){
                 int currentDate = current.date;
                 double min = -1;
                 double minVol = 0;
+                String priceString;
+                if((priceString = prices.get(currentRow)[i]).equals("")){
+                    do {
+                        current = nextCall(calls);
+                    } while(current == null);
+                    currentRow = getCurrentRow(currentRow, current, prices);
+                    continue;
+                }
+                double price = Double.parseDouble(priceString)*0.95;
                 while (current.date == currentDate) {
-                    double diff = Math.abs(Double.parseDouble(prices.get(currentRow)[i]) - current.strike);
+                    double diff = Math.abs(price - current.strike);
                     if(min == -1 || diff < min){
                         min = diff;
                         minVol = current.volatility;
                     }
                     do {
+                        if(!calls.hasNext()) break loop;
                         current = nextCall(calls);
                     } while(current == null);
                 }
                 callVolatilities[currentRow][i] = min == -1 ? "" : minVol+"";
                 currentRow = getCurrentRow(currentRow, current, prices);
+                if(currentRow == -1)
+                    break;
             }
         }
 
-        //optimizedLoops(calls, prices, companies, callVolatilities);
+        try {
+            CSVWriter writer = new CSVWriter(new FileWriter(DATA_PUT_OUTPUT_CSV));
+            for(String[] row : callVolatilities)
+                writer.writeNext(row);
+            writer.close();
+        } catch (IOException e) {
+            System.out.println("Failure");
+            e.printStackTrace();
+        }
     }
 
     private static int getCurrentRow(int start, Call call, List<String[]> prices){
         int row = start;
+
         while(Integer.parseInt(prices.get(row)[0]) != call.date){
             row++;
+            if(row >= prices.size()) return -1;
         }
         return row;
     }
